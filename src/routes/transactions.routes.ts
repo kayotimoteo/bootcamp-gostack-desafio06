@@ -12,10 +12,10 @@ const transactionsRouter = Router();
 const upload = multer(uploadConfig);
 
 transactionsRouter.get('/', async (request, response) => {
-  const transactionRepository = getCustomRepository(TransactionsRepository);
+  const transactionsRepository = getCustomRepository(TransactionsRepository);
 
-  const transactions = await transactionRepository.find();
-  const balance = await transactionRepository.getBalance();
+  const transactions = await transactionsRepository.find();
+  const balance = await transactionsRepository.getBalance();
 
   return response.json({ transactions, balance });
 });
@@ -30,10 +30,6 @@ transactionsRouter.post('/', async (request, response) => {
     type,
     category,
   });
-
-  delete transaction.created_at;
-  delete transaction.updated_at;
-
   return response.json(transaction);
 });
 
@@ -41,23 +37,19 @@ transactionsRouter.delete('/:id', async (request, response) => {
   const { id } = request.params;
   const deleteTransaction = new DeleteTransactionService();
 
-  await deleteTransaction.execute({ id });
+  await deleteTransaction.execute(id);
 
   return response.status(204).send();
 });
 
 transactionsRouter.post(
   '/import',
-  upload.single('file'), // tem que ter o mesmo nome do campo lá no insomnia
+  upload.single('file'),
   async (request, response) => {
-    const { filename } = request.file;
-
     const importTransaction = new ImportTransactionsService();
-    const transaction = await importTransaction.execute({
-      filename,
-    });
+    const transactions = await importTransaction.execute(request.file.path);
 
-    return response.json(transaction);
+    return response.json(transactions);
   },
 );
 

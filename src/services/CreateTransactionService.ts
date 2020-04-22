@@ -1,12 +1,11 @@
-import { getRepository, getCustomRepository } from 'typeorm';
+import { getCustomRepository, getRepository } from 'typeorm';
 
 import AppError from '../errors/AppError';
 
 import Transaction from '../models/Transaction';
+import Category from '../models/Category';
 
 import TransactionsRepository from '../repositories/TransactionsRepository';
-
-import CreateCategoryService from './CreateCategoryService';
 
 interface Request {
   title: string;
@@ -22,28 +21,37 @@ class CreateTransactionService {
     type,
     category,
   }: Request): Promise<Transaction> {
-    const transactionRepository = getRepository(Transaction);
+    const transactionsRepository = getCustomRepository(TransactionsRepository);
+    const categoryRepository = getRepository(Category);
 
-    const createCategory = new CreateCategoryService();
+    const { total } = await transactionsRepository.getBalance();
 
-    const returnCategory = await createCategory.execute({ title: category });
-
-    const transactionBalance = getCustomRepository(TransactionsRepository);
-
-    const balance = transactionBalance.getBalance();
-
-    if (type === 'outcome' && value > (await balance).total) {
-      throw new AppError('insufficient funds', 400);
+    if (type === 'outcome' && total < value) {
+      throw new AppError('You do not have enough balance');
     }
 
-    const transaction = transactionRepository.create({
+    let transactionCategory = await categoryRepository.findOne({
+      where: {
+        title: category,
+      },
+    });
+
+    if (!transactionCategory) {
+      transactionCategory = categoryRepository.create({
+        title: category,
+      });
+
+      await categoryRepository.save(transactionCategory);
+    }
+
+    const transaction = transactionsRepository.create({
       title,
       value,
       type,
-      category_id: returnCategory.id,
+      category: transactionCategory,
     });
 
-    await transactionRepository.save(transaction);
+    await transactionsRepository.save(transaction);
 
     return transaction;
   }
